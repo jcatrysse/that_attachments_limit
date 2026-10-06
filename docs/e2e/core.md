@@ -1,6 +1,6 @@
 # core
 
-Run 2026-10-06T19:32:09.310Z against http://127.0.0.1:3000.
+Run 2026-10-06T19:39:10.703Z against http://127.0.0.1:3000.
 
 | screenshot | user | URL | shows |
 |---|---|---|---|

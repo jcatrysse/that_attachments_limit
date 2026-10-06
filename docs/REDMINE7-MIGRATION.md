@@ -18,7 +18,7 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 | Plugin id | `that_attachments_limit` |
 | GEOxyz runs today | `master` |
 | Upstream | ThatCompany/that_attachments_limit master @ 444a4ee (2019-12-13) |
-| Runs on Redmine 7 as is | NEE |
+| Runs on Redmine 7 as is | NEE (fixed on this branch, see "Result of the migration session") |
 | Upstream sync | UPSTREAM DOOD |
 | After sync | n.v.t. |
 | Complexity (1 trivial .. 5 rewrite) | 2 |
@@ -28,6 +28,57 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 ## Already on this branch
 
 - `871f032` Bring addFile in line with Redmine 6+ SVG icons
+
+## Result of the migration session (2026-10-06)
+
+Measured on Redmine 7.0.1 (7.0-stable-GEOxyz), Ruby 3.3.6, PostgreSQL 16.15 and MariaDB 10.11.14.
+
+| | PostgreSQL | MariaDB |
+|---|---|---|
+| Baseline plugin tests (before) | none existed | none existed |
+| Plugin tests after | 7 runs, 64 assertions, 0 failures | 7 runs, 64 assertions, 0 failures |
+| e2e (production mode) | smoke 11 shots, core 6, other-forms 5, settings 7, upload-limit 9, 0 problems | same, 0 problems |
+
+Baseline e2e before changes (branch head with 871f032): smoke 11/0, core 6/0 on PostgreSQL.
+The new tests fail without the fix: breaking the fallback to 10 in `_form.html.erb` gave 2 failures.
+Migrations: the plugin has none. Boot and production eager load: the e2e server runs in production mode.
+
+Verdicts on the GEOxyz changes:
+
+| commit | verdict |
+|---|---|
+| `baff6c2` Make it work under Redmine 5 | kept (the `render :parent` locals in `_form.html.erb`, needed so 5.x/6/7 locals pass through). Test: new integration tests render the form on 7.0. |
+| `4d3e401` limit also in uploadAndAttachFiles | kept; covered by e2e drop/paste scenario (`upload-limit`, drop-above-limit). Core in 7.0 still hardcodes 10 there. |
+| `871f032` SVG icons like Redmine 6+ | kept, this is what makes uploads work on 7.0 |
+
+Changed in this session: tests added (`test/integration/attachments_limit_test.rb`), the alert text now
+names the configured limit instead of core's hardcoded (10), e2e scenarios with screenshots in `docs/e2e/`.
+
+Webhooks (item 5): the plugin neither hides nor changes issue data, so nothing to do for Redmine 7 webhooks.
+Together with the other GEOxyz plugins (item 7): not run, those plugins are not available in this session. Left for the coordinator harness.
+Not done: run on 5.1-stable and "before" pictures on 5.1 (this branch is not meant to stay 5.1-compatible in this session). Item 1 (manual staging upload test) is covered by the e2e scenarios, a staging check by a person is still sensible.
+Not testable here: a real paste of a screenshot from the clipboard; `uploadAndAttachFiles` is exercised directly (same path as drop and paste).
+OpenAI review: `docs/reviews/openai-2026-10-06-d9ccdc2.md`, both findings resolved there.
+
+### Inventory of functions
+
+| function | how a user reaches it | scenario | screenshot |
+|---|---|---|---|
+| Configure the limit | Administration > Plugins > Configure (admin) | `settings` | `settings-settings-form.png`, `settings-saved-7.png`, `settings-fallback-10.png` |
+| Limit refused for non-admins | same URL as manager, reporter, anonymous | `settings` | `settings-manager-refused.png`, `settings-reporter-refused.png`, `settings-anonymous-login.png` |
+| Fallback to 10 for blank, 0, negative, text | settings | `settings`, integration test | `settings-fallback-10.png` |
+| Limit on file pick (add button hides) | new issue form | `upload-limit` | `upload-limit-two-of-three.png`, `upload-limit-three-of-three.png`, `upload-limit-saved-with-three.png` |
+| Alert above the limit, names the limit | pick 5 files at once | `upload-limit` | `upload-limit-five-at-once.png` |
+| Limit on drop/paste (`uploadAndAttachFiles`) | drop or paste files | `upload-limit` | `upload-limit-drop-above-limit.png` |
+| Size limit still applies | 6 MB file | `upload-limit` | `upload-limit-too-big.png` |
+| Same limit for members without permissions | reporter | `upload-limit` | `upload-limit-reporter-limit.png` |
+| No access | outsider on private project, anonymous | `upload-limit` | `upload-limit-outsider-refused.png`, `upload-limit-anonymous-login.png` |
+| Other forms | wiki, news, document, files, issue edit | `other-forms` | `other-forms-*.png` |
+
+## Open questions for Jan
+
+- The alert text is fixed in the plugin's JS by replacing the number 10 in core's localized message. The alternative is to leave core's wrong text. Recommendation: keep the fix (the plugin is dropped at 7.1 anyway).
+- The plugin shadows core's `addFile` and `uploadAndAttachFiles` (item 3). Recommendation: keep until the move to 7.1 (#18556), then remove the plugin.
 
 ## Work list for the migration session
 

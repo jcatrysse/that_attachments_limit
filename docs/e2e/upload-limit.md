@@ -1,12 +1,12 @@
 # upload-limit
 
-Run 2026-10-06T19:33:21.051Z against http://127.0.0.1:3000.
+Run 2026-10-06T19:39:53.500Z against http://127.0.0.1:3000.
 
 | screenshot | user | URL | shows |
 |---|---|---|---|
 | ![](upload-limit-two-of-three.png) | manager | `/projects/e2e-project/issues/new` | Two files uploaded, the add button is still there (limit 3) |
 | ![](upload-limit-three-of-three.png) | manager | `/projects/e2e-project/issues/new` | Three files uploaded, the add button is gone, no alert |
-| ![](upload-limit-saved-with-three.png) | manager | `/issues/11` | The issue is saved with all three attachments |
+| ![](upload-limit-saved-with-three.png) | manager | `/issues/10` | The issue is saved with all three attachments |
 | ![](upload-limit-five-at-once.png) | manager | `/projects/e2e-project/issues/new` | Five files at once: only 3 are kept; alert text: "This file cannot be uploaded because it exceeds the maximum number of files that can be attached simultaneously (3)" |
 | ![](upload-limit-drop-above-limit.png) | manager | `/projects/e2e-project/issues/new` | 1 file present, 3 dropped: the list stops at 3 and the alert is shown |
 | ![](upload-limit-too-big.png) | manager | `/projects/e2e-project/issues/new` | A 6 MB file is refused; alert "This file cannot be uploaded because it exceeds the maximum allowed file size (5 MB)" |
