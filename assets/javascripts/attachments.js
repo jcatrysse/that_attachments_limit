@@ -54,7 +54,8 @@ function uploadAndAttachFiles(files, inputEl) {
     }
 
     if (filesLength > ($(inputEl).attr('multiple') == 'multiple' ? window.maxFileUploads : 1)) {
-        window.alert($(inputEl).data('max-number-of-files-message'));
+        var tooManyMessage = String($(inputEl).data('max-number-of-files-message'));
+        window.alert($(inputEl).attr('multiple') == 'multiple' ? tooManyMessage.replace('10', window.maxFileUploads) : tooManyMessage);
     }
     return sizeExceeded;
 }
