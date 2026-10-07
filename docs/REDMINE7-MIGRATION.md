@@ -54,6 +54,8 @@ Verdicts on the GEOxyz changes:
 Changed in this session: tests added (`test/integration/attachments_limit_test.rb`), the alert text now
 names the configured limit instead of core's hardcoded (10), e2e scenarios with screenshots in `docs/e2e/`.
 
+Re-run on 2026-10-07 after Jan's decisions, PostgreSQL only: plugin tests 7 runs, 64 assertions, 0 failures; e2e smoke 11, core 6, other-forms 5, settings 7, upload-limit 9 screenshots, 0 problems. The screenshots in `docs/e2e/` are from this run. The MariaDB runs above stay as a note (no longer required).
+
 Webhooks (item 5): the plugin neither hides nor changes issue data, so nothing to do for Redmine 7 webhooks.
 Together with the other GEOxyz plugins (item 7): not run, those plugins are not available in this session. Left for the coordinator harness.
 Not done: run on 5.1-stable and "before" pictures on 5.1 (this branch is not meant to stay 5.1-compatible in this session). Item 1 (manual staging upload test) is covered by the e2e scenarios, a staging check by a person is still sensible.
