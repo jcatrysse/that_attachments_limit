@@ -75,10 +75,18 @@ OpenAI review: `docs/reviews/openai-2026-10-06-d9ccdc2.md`, both findings resolv
 | No access | outsider on private project, anonymous | `upload-limit` | `upload-limit-outsider-refused.png`, `upload-limit-anonymous-login.png` |
 | Other forms | wiki, news, document, files, issue edit | `other-forms` | `other-forms-*.png` |
 
-## Open questions for Jan
+## Decided by Jan (2026-10-07)
 
-- The alert text is fixed in the plugin's JS by replacing the number 10 in core's localized message. The alternative is to leave core's wrong text. Recommendation: keep the fix (the plugin is dropped at 7.1 anyway).
-- The plugin shadows core's `addFile` and `uploadAndAttachFiles` (item 3). Recommendation: keep until the move to 7.1 (#18556), then remove the plugin.
+General, for every GEOxyz plugin:
+- GEOxyz goes straight to Redmine 7: no backports to 5.1, nothing is cherry-picked to `master`; `redmine70-migration` is what goes live. 5.1 compatibility is no longer a requirement, and there are no code paths for 5.1 only.
+- Production runs PostgreSQL 16, not MariaDB/MySQL. Tests and e2e run on PostgreSQL only; SQL stays portable where that is free; a MariaDB-only problem is a note, not a blocker.
+- A plugin that needs deface requires it without a version constraint (this plugin does not use deface).
+- A core method that other plugins also patch is patched with `prepend`, never `alias_method`. This plugin patches no Ruby method (only a view partial and a JS file), so nothing to change. Not run together with the other GEOxyz plugins in this session (not available here): left for the harness.
+- GitHub Actions stay manual only.
+
+For this plugin:
+1. that_attachments_limit-q1, keep the fix that shows the right maximum in the alert: Jan chose A, "De fix houden" ("Gebruikers zien het juiste maximum; de plugin past daarvoor wel een tekst van Redmine aan."). Built in `d9ccdc2` and `bf7e325`, test: e2e `upload-limit`. No further change.
+2. that_attachments_limit-q2, keep the plugin until Redmine 7.1: Jan chose A, "Houden tot Redmine 7.1, dan verwijderen" ("Het eigen maximum blijft werken; nieuwe Redmine-fixes aan het uploaden komen tot dan niet door."). Nothing to build; see "After the upgrade".
 
 ## Work list for the migration session
 
@@ -92,7 +100,7 @@ In this order: things that break, security, the GEOxyz changes, the open items, 
 
 **Checks**
 
-4. Run the plugin's whole test suite on Redmine 7.0-stable-GEOxyz with PostgreSQL AND MariaDB, and once on 5.1-stable if the branch is meant to stay 5.1-compatible.
+4. Run the plugin's whole test suite on Redmine 7.0-stable-GEOxyz with PostgreSQL. (Decided 2026-10-07: PostgreSQL only, no 5.1.)
 5. Check Redmine 7 webhooks against this plugin (see "Rules"), and note the result here even if nothing is needed.
 6. Verify every feature of the plugin by hand on a running Redmine 7 (screenshots).
 
@@ -220,8 +228,9 @@ results quoted in the analysis come from it.
   (on by default: `t.sudo()` in a scenario). The breaker list is in the migration kit's CHECKLIST.md.
 - **Locales**: keep the locales the plugin ships in sync; translate a new key by matching the
   closest existing key in the same file, not from scratch; do not add new languages.
-- **5.1 compatibility**: prefer fixes that also run on Redmine 5.1 so they can be merged early;
-  say so when a fix cannot.
+- **No 5.1 compatibility, PostgreSQL only** (decided 2026-10-07): no code paths for Redmine 5.1; tests and e2e run on PostgreSQL 16, keep SQL portable where free.
+  (Old rule, withdrawn: prefer fixes that also run on Redmine 5.1 so they can be merged early;
+  say so when a fix cannot.)
 - **Git**: work on `redmine70-migration` only; never push to the default branch; never force-push
   a branch someone else uses. Descriptive commit messages (what and why). Push after every
   commit, together with the updated status in this file: a cloud session can stop at a usage
