@@ -1,0 +1,3 @@
+<% maxFileUploads = Setting.plugin_that_attachments_limit['attachments_limit'].to_i %>
+<%= javascript_tag("var maxFileUploads = #{maxFileUploads > 0 ? maxFileUploads : 10};") %>
+<%= javascript_include_tag('attachments', :plugin => 'that_attachments_limit') %>

@@ -47,7 +47,7 @@ Verdicts on the GEOxyz changes:
 
 | commit | verdict |
 |---|---|
-| `baff6c2` Make it work under Redmine 5 | kept (the `render :parent` locals in `_form.html.erb`, needed so 5.x/6/7 locals pass through). Test: new integration tests render the form on 7.0. |
+| `baff6c2` Make it work under Redmine 5 | kept (the `render :parent` locals in `_form.html.erb`, needed so 5.x/6/7 locals pass through). Test: new integration tests render the form on 7.0. Superseded 2026-10-29: the override and render_parent are gone (see "Thread safety"). |
 | `4d3e401` limit also in uploadAndAttachFiles | kept; covered by e2e drop/paste scenario (`upload-limit`, drop-above-limit). Core in 7.0 still hardcodes 10 there. |
 | `871f032` SVG icons like Redmine 6+ | kept, this is what makes uploads work on 7.0 |
 
@@ -76,6 +76,54 @@ OpenAI review: `docs/reviews/openai-2026-10-06-d9ccdc2.md`, both findings resolv
 | Same limit for members without permissions | reporter | `upload-limit` | `upload-limit-reporter-limit.png` |
 | No access | outsider on private project, anonymous | `upload-limit` | `upload-limit-outsider-refused.png`, `upload-limit-anonymous-login.png` |
 | Other forms | wiki, news, document, files, issue edit | `other-forms` | `other-forms-*.png` |
+| Limit script on every form through the view hook (limit 2, unset 10, single file) | issue new, issue note, wiki; private project custom field | `limit-delivery` | `limit-delivery-*.png` |
+
+## Thread safety: render_parent removed (decided by Jan 2026-10-29)
+
+Problem: render_parent 0.1.0 keeps its template exclusions on the `ActionView::PathSet`, and on
+Rails 8.1 that object is shared by every request of the process. While one thread rendered the
+parent of the plugin's `attachments/_form` override, another thread rendering the form skipped the
+override and got core's form without `var maxFileUploads` and without the plugin's
+`attachments.js` (the coordinator's load test: Puma 4 workers x 5 threads, 3 of 528 issue pages).
+
+Fix: no view override and no render_parent any more. `ThatAttachmentsLimit::Hooks`
+(`lib/that_attachments_limit/hooks.rb`) renders `hooks/that_attachments_limit/_limit_script` on
+`view_layouts_base_body_bottom`: the `var maxFileUploads = N` tag and the plugin's
+`attachments.js`. The body bottom comes after `yield :header_tags` in `base.html.erb`, where core's
+form puts core `attachments.js`, so the plugin's `addFile` and `uploadAndAttachFiles` replace core's
+on every page with an attachments form (they are only called from user actions, after the page is
+parsed). On pages without a form the script defines functions nobody calls. Behaviour for the user
+is unchanged: setting > 0 is the limit, otherwise 10; single-file inputs stay 1. The `Gemfile`
+(render_parent only) is gone.
+
+One difference with the old override: it did not pass core's `attachment_format_custom_field`
+local through `render :parent`, so a file custom field got the `filedrop` class instead of
+`custom-field-filedrop` (files dropped on the issue form could land in the custom field). Core's
+form is now rendered as is, so that is fixed.
+
+Not changed (core): the `data-max-number-of-files-message` that core's form renders still says 10;
+the plugin's `uploadAndAttachFiles` replaces that 10 by the configured limit in the alert, as before.
+
+Tests (`test/integration/attachments_limit_test.rb`), red on the old code (branch head
+`162579f`), run with the old `_form.html.erb` and Gemfile:
+- `test_limit_script_present_while_another_thread_renders_the_attachments_form`: a second thread is
+  held inside the attachments form while the issue page is requested. Old code: failure, the page
+  has no `var maxFileUploads = 2;` (the render_parent exclusion of the other thread hid the
+  override). New: passes.
+- `test_custom_field_file_input_keeps_core_drop_target_class`: old code fails (no
+  `custom-field-filedrop` input), new passes.
+- `test_limit_script_loads_after_core_on_every_attachments_form`: issue new, issue show (note
+  form), issue edit, wiki edit, news, document new and show, forum message, files: the limit and
+  the plugin script are present and come after core `attachments.js`. Passes on the old code too;
+  it guards the load order of the hook.
+
+Results (PostgreSQL 16.15, Redmine 7.0-stable-GEOxyz, Rails 8.1, Ruby 3.3.6):
+- plugin suite before: 7 runs, 64 assertions, 0 failures; with the new tests on the old code:
+  10 runs, 152 assertions, 2 failures; after: 10 runs, 162 assertions, 0 failures.
+- e2e (production mode): smoke 11, core 6, limit-delivery 5, other-forms 5, settings 7,
+  upload-limit 9 screenshots, 0 problems. `limit-delivery`: limit 2 refuses the third file on the
+  issue form, the issue note form and the wiki; unset gives 10 (11th refused); the single-file
+  custom field keeps 1. The e2e seed adds a file custom field, only in `e2e-private`.
 
 ## Decided by Jan (2026-10-07)
 
@@ -83,7 +131,7 @@ General, for every GEOxyz plugin:
 - GEOxyz goes straight to Redmine 7: no backports to 5.1, nothing is cherry-picked to `master`; `redmine70-migration` is what goes live. 5.1 compatibility is no longer a requirement, and there are no code paths for 5.1 only.
 - Production runs PostgreSQL 16, not MariaDB/MySQL. Tests and e2e run on PostgreSQL only; SQL stays portable where that is free; a MariaDB-only problem is a note, not a blocker.
 - A plugin that needs deface requires it without a version constraint (this plugin does not use deface).
-- A core method that other plugins also patch is patched with `prepend`, never `alias_method`. This plugin patches no Ruby method (only a view partial and a JS file), so nothing to change. Not run together with the other GEOxyz plugins in this session (not available here): left for the harness.
+- A core method that other plugins also patch is patched with `prepend`, never `alias_method`. This plugin patches no Ruby method (only a view partial and a JS file; since 2026-10-29 a view hook and a JS file), so nothing to change. Not run together with the other GEOxyz plugins in this session (not available here): left for the harness.
 - GitHub Actions stay manual only.
 
 For this plugin:
@@ -120,6 +168,9 @@ These GEOxyz commits are on the branch GEOxyz runs today and therefore on this b
 Actions the person doing the upgrade must take, or know about, for this plugin:
 
 - Drop the plugin when GEOxyz moves to Redmine 7.1 (max_attachments_at_once, #18556).
+- Run `bundle install` in the Redmine directory when deploying this branch: the plugin no longer
+  has a Gemfile, so the `render_parent` gem leaves the bundle (Gemfile.lock changes). No other
+  GEOxyz plugin uses `render :parent`.
 
 ## How to test
 

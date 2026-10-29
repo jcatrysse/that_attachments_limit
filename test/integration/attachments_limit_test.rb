@@ -3,7 +3,9 @@ require File.expand_path('../../../../../test/test_helper', __FILE__)
 class AttachmentsLimitTest < Redmine::IntegrationTest
   fixtures :projects, :users, :email_addresses, :roles, :members, :member_roles,
            :trackers, :projects_trackers, :enabled_modules, :issue_statuses,
-           :enumerations, :workflows, :wikis, :wiki_pages, :wiki_contents
+           :enumerations, :workflows, :wikis, :wiki_pages, :wiki_contents,
+           :issues, :journals, :news, :documents, :boards, :messages, :custom_fields,
+           :custom_fields_projects, :custom_fields_trackers
 
   def setup
     @original = Setting.plugin_that_attachments_limit
@@ -83,5 +85,79 @@ class AttachmentsLimitTest < Redmine::IntegrationTest
     post '/settings/plugin/that_attachments_limit', :params => {:settings => {:attachments_limit => '99'}}
     assert_response :forbidden
     assert_equal '3', Setting.plugin_that_attachments_limit['attachments_limit']
+  end
+
+  def assert_limit_script_after_core(limit)
+    assert_select 'script', :text => /var maxFileUploads = #{limit};/
+    core = response.body.index(%r{<script src="[^"]*/assets/attachments-})
+    plugin = response.body.index(%r{<script src="[^"]*/plugin_assets/that_attachments_limit/attachments})
+    assert core, 'core attachments.js is not on the page'
+    assert plugin, 'the plugin attachments.js is not on the page'
+    assert core < plugin, 'the plugin attachments.js must load after core attachments.js'
+  end
+
+  def test_limit_script_loads_after_core_on_every_attachments_form
+    set_limit('4')
+    log_user('jsmith', 'jsmith')
+    [
+      '/projects/ecookbook/issues/new',
+      '/issues/1',
+      '/issues/1/edit',
+      '/projects/ecookbook/wiki/CookBook_documentation/edit',
+      '/projects/ecookbook/news/new',
+      '/projects/ecookbook/documents/new',
+      '/documents/1',
+      '/boards/1/topics/new',
+      '/projects/ecookbook/files/new'
+    ].each do |path|
+      get path
+      assert_response :success, path
+      assert_select '.attachments_form input.file_selector', {:minimum => 1}, path
+      assert_limit_script_after_core(4)
+    end
+  end
+
+  def test_custom_field_file_input_keeps_core_drop_target_class
+    field = IssueCustomField.create!(:name => 'Attachment field', :field_format => 'attachment',
+                                     :is_for_all => true, :tracker_ids => Tracker.pluck(:id))
+    log_user('jsmith', 'jsmith')
+    get '/projects/ecookbook/issues/new'
+    assert_response :success
+    assert_select "input.file_selector.custom-field-filedrop[name=?]", "issue[custom_field_values][#{field.id}][dummy][file]"
+    assert_select "input.file_selector.custom-field-filedrop:not([multiple])"
+    assert_limit_script_after_core(10)
+  end
+
+  # Another request in the same process is inside the attachments form while this one renders
+  # the issue page. With render_parent (shared PathSet exclusions) this page lost the script.
+  def test_limit_script_present_while_another_thread_renders_the_attachments_form
+    set_limit('2')
+    log_user('jsmith', 'jsmith')
+    inside = Queue.new
+    release = Queue.new
+    blocker = Module.new do
+      define_method(:attachment_max_size) do
+        if Thread.current[:attachments_limit_block]
+          Thread.current[:attachments_limit_block] = false
+          inside << true
+          release.pop
+        end
+        super()
+      end
+    end
+    Setting.singleton_class.prepend(blocker)
+    other = Thread.new do
+      Thread.current[:attachments_limit_block] = true
+      ApplicationController.render(:partial => 'attachments/form', :locals => {:container => Issue.new})
+    end
+    begin
+      assert inside.pop(:timeout => 10), 'the other thread never reached the attachments form'
+      get '/projects/ecookbook/issues/new'
+      assert_response :success
+      assert_limit_script_after_core(2)
+    ensure
+      release << true
+      other.join(10)
+    end
   end
 end

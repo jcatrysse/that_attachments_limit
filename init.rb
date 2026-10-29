@@ -1,4 +1,5 @@
 require 'redmine'
+require_relative 'lib/that_attachments_limit/hooks'
 
 Rails.logger.info 'Starting That Attachments Limit plugin for Redmine'
 
