@@ -124,6 +124,12 @@ Results (PostgreSQL 16.15, Redmine 7.0-stable-GEOxyz, Rails 8.1, Ruby 3.3.6):
   upload-limit 9 screenshots, 0 problems. `limit-delivery`: limit 2 refuses the third file on the
   issue form, the issue note form and the wiki; unset gives 10 (11th refused); the single-file
   custom field keeps 1. The e2e seed adds a file custom field, only in `e2e-private`.
+- Together with the other GEOxyz plugins (coordinator, def2d6f): 1 failure, `/issues/1` answered 403
+  because redmine_view_issue_description refuses the issue page to roles without
+  `:view_issue_description`. The test setup now grants it when that plugin is installed, and
+  `test_issue_pages_are_reachable_for_the_test_role` guards it. Standalone: 11 runs, 167
+  assertions, 0 failures. With a local stub of that plugin (permission plus a 403 on issue
+  show/edit): old test file 10 runs, 99 assertions, 1 failure; new 11 runs, 167 assertions, 0 failures.
 - OpenAI review of `162579f..04a6fb6`: no findings (`docs/reviews/openai-2026-10-29-04a6fb6.md`).
 - Commits: `d2aa7c4` (screenshots, and by mistake already the removal of `_form.html.erb` and the
   Gemfile), `04a6fb6` (hook, tests, docs). Use `04a6fb6` or later; `d2aa7c4` alone has no limit.

@@ -11,6 +11,15 @@ class AttachmentsLimitTest < Redmine::IntegrationTest
     @original = Setting.plugin_that_attachments_limit
     Role.find(1).add_permission! :add_issues
     Role.find(1).add_permission! :edit_wiki_pages
+    grant_view_issue_description(Role.find(1))
+  end
+
+  # redmine_view_issue_description (installed at GEOxyz) refuses the issue page to roles without
+  # its permission; the fixture roles do not have it.
+  def grant_view_issue_description(*roles)
+    return unless Redmine::Plugin.installed?(:redmine_view_issue_description)
+
+    roles.each { |role| role.add_permission! :view_issue_description }
   end
 
   def teardown
@@ -94,6 +103,14 @@ class AttachmentsLimitTest < Redmine::IntegrationTest
     assert core, 'core attachments.js is not on the page'
     assert plugin, 'the plugin attachments.js is not on the page'
     assert core < plugin, 'the plugin attachments.js must load after core attachments.js'
+  end
+
+  def test_issue_pages_are_reachable_for_the_test_role
+    log_user('jsmith', 'jsmith')
+    ['/issues/1', '/issues/1/edit'].each do |path|
+      get path
+      assert_response :success, path
+    end
   end
 
   def test_limit_script_loads_after_core_on_every_attachments_form
