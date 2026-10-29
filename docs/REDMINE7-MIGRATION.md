@@ -124,6 +124,9 @@ Results (PostgreSQL 16.15, Redmine 7.0-stable-GEOxyz, Rails 8.1, Ruby 3.3.6):
   upload-limit 9 screenshots, 0 problems. `limit-delivery`: limit 2 refuses the third file on the
   issue form, the issue note form and the wiki; unset gives 10 (11th refused); the single-file
   custom field keeps 1. The e2e seed adds a file custom field, only in `e2e-private`.
+- OpenAI review of `162579f..04a6fb6`: no findings (`docs/reviews/openai-2026-10-29-04a6fb6.md`).
+- Commits: `d2aa7c4` (screenshots, and by mistake already the removal of `_form.html.erb` and the
+  Gemfile), `04a6fb6` (hook, tests, docs). Use `04a6fb6` or later; `d2aa7c4` alone has no limit.
 
 ## Decided by Jan (2026-10-07)
 
